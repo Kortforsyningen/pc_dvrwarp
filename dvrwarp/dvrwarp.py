@@ -5,7 +5,7 @@ def main():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('input_pointcloud', type=str, help='path to input pointcloud file')
     argument_parser.add_argument('output_pointcloud', type=str, help='path to desired output pointcloud file')
-    argument_parser.add_argument('--raster-path', type=str, help='path to colorization raster')
+    argument_parser.add_argument('--color-raster', type=str, help='path to colorization raster file')
     argument_parser.add_argument('--retain-extra-dims', action='store_const', const=True)
 
     input_arguments = argument_parser.parse_args()
@@ -20,10 +20,10 @@ def main():
         output_filename,
     ]
 
-    if input_arguments.raster_path is not None:
+    if input_arguments.color_raster is not None:
         pdal_args += [
             "colorization",
-            f"--filters.colorization.raster={input_arguments.raster_path}"
+            f"--filters.colorization.raster={input_arguments.color_raster}"
         ]
         output_dataformat = 7 # modern PDRF with RGB color
     else:
