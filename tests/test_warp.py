@@ -2,9 +2,12 @@ from . import conftest
 
 import pytest
 import laspy
+from laspy.vlrs.known import LasZipVlr, WktCoordinateSystemVlr
+from osgeo import osr
 import numpy as np
 
 import subprocess
+import json
 
 # Maximum allowed deviations from expected data (in georeferenced units,
 # meters) in output.
@@ -36,12 +39,40 @@ def assert_rgb_equal(actual_lasdata, expected_lasdata):
     np.testing.assert_equal(actual_lasdata.points.green, expected_lasdata.points.green)
     np.testing.assert_equal(actual_lasdata.points.blue, expected_lasdata.points.blue)
 
-# TODO implement SRS check?
+def assert_is_laz(filename, expected_is_laz):
+    laszip_user_id = LasZipVlr.official_user_id()
+    
+    # A bit hackish - Laspy seems to hide the presence of LASzip compression from the user, so inspect with PDAL instead
+    pdal_info_output = subprocess.check_output(['pdal', 'info', '--metadata', str(filename)])
+    info_obj = json.loads(pdal_info_output)
+    metadata = info_obj['metadata']
+    vlrs = [metadata[key] for key in metadata if key.startswith('vlr_')]
+    vlr_user_ids = [vlr['user_id'] for vlr in vlrs]
+
+    has_laszip_vlr = laszip_user_id in vlr_user_ids
+    assert has_laszip_vlr == expected_is_laz
+
+def assert_srs_correct(actual_lasdata):
+    expected_srs = osr.SpatialReference()
+    expected_srs.ImportFromEPSG(7416)
+    
+    coordinate_system_user_id = WktCoordinateSystemVlr.official_user_id()
+    
+    actual_wkt_vlr = actual_lasdata.vlrs.get_by_id(user_id=coordinate_system_user_id)[0]
+    actual_srs = osr.SpatialReference()
+    actual_srs.ImportFromWkt(actual_wkt_vlr.string)
+
+    assert actual_srs.IsSame(expected_srs)
 
 # TODO implement extrabyte check? (use smth like np.array(lasdata.points['Pulse width']))
 
-def test_dvrwarp(read_expected_las, tmp_path):
-    output_filename = tmp_path.joinpath('output.laz')
+@pytest.mark.parametrize("write_compressed", [False, True])
+def test_dvrwarp(read_expected_las, tmp_path, write_compressed):
+    if write_compressed:
+        output_extension = 'laz'
+    else:
+        output_extension = 'las'
+    output_filename = tmp_path.joinpath(f'output.{output_extension}')
     
     subprocess.check_call([
         'dvrwarp',
@@ -53,11 +84,18 @@ def test_dvrwarp(read_expected_las, tmp_path):
     expected_lasdata = read_expected_las
 
     assert_xyz_approx_equal(written_lasdata, expected_lasdata)
+    assert_srs_correct(written_lasdata)
     assert_las_version_correct(written_lasdata)
     assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITHOUT_COLOR)
+    assert_is_laz(output_filename, write_compressed)
 
-def test_dvrwarp_colorized(read_expected_las, tmp_path):
-    output_filename = tmp_path.joinpath('output_colorized.laz')
+@pytest.mark.parametrize("write_compressed", [False, True])
+def test_dvrwarp_colorized(read_expected_las, tmp_path, write_compressed):
+    if write_compressed:
+        output_extension = 'laz'
+    else:
+        output_extension = 'las'
+    output_filename = tmp_path.joinpath(f'output_colorized.{output_extension}')
 
     subprocess.check_call([
         'dvrwarp',
@@ -72,5 +110,7 @@ def test_dvrwarp_colorized(read_expected_las, tmp_path):
     
     assert_xyz_approx_equal(written_lasdata, expected_lasdata)
     assert_rgb_equal(written_lasdata, expected_lasdata)
+    assert_srs_correct(written_lasdata)
     assert_las_version_correct(written_lasdata)
     assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITH_COLOR)
+    assert_is_laz(output_filename, write_compressed)
