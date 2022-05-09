@@ -67,19 +67,30 @@ def assert_srs_correct(actual_lasdata):
 # TODO implement extrabyte check? (use smth like np.array(lasdata.points['Pulse width']))
 
 @pytest.mark.parametrize("input_path", conftest.INPUT_PC_PATHS)
+@pytest.mark.parametrize("colorization_raster", [None, conftest.COLORIZATION_RASTER_PATH])
 @pytest.mark.parametrize("write_compressed", [False, True])
-def test_dvrwarp(input_path, write_compressed, read_expected_las, tmp_path):
+def test_dvrwarp(input_path, colorization_raster, write_compressed, read_expected_las, tmp_path):
     if write_compressed:
         output_extension = 'laz'
     else:
         output_extension = 'las'
     output_filename = tmp_path.joinpath(f'output.{output_extension}')
     
-    subprocess.check_call([
+    call_args = [
         'dvrwarp',
         str(input_path),
         str(output_filename),
-    ])
+    ]
+    if colorization_raster is not None:
+        call_args += [
+            '--color-raster',
+            str(conftest.COLORIZATION_RASTER_PATH),
+        ]
+
+    # Print resulting argument list for easier debugging (will be captured by
+    # pytest unless it is called with the -s flag)
+    print('call:\n{}'.format(' '.join(call_args)))
+    subprocess.check_call(call_args)
     
     written_lasdata = laspy.read(output_filename)
     expected_lasdata = read_expected_las
@@ -87,32 +98,11 @@ def test_dvrwarp(input_path, write_compressed, read_expected_las, tmp_path):
     assert_xyz_approx_equal(written_lasdata, expected_lasdata)
     assert_srs_correct(written_lasdata)
     assert_las_version_correct(written_lasdata)
-    assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITHOUT_COLOR)
-    assert_is_laz(output_filename, write_compressed)
-
-@pytest.mark.parametrize("input_path", conftest.INPUT_PC_PATHS)
-@pytest.mark.parametrize("write_compressed", [False, True])
-def test_dvrwarp_colorized(input_path, write_compressed, read_expected_las, tmp_path):
-    if write_compressed:
-        output_extension = 'laz'
+    
+    if colorization_raster is None:
+        assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITHOUT_COLOR)
     else:
-        output_extension = 'las'
-    output_filename = tmp_path.joinpath(f'output_colorized.{output_extension}')
-
-    subprocess.check_call([
-        'dvrwarp',
-        str(input_path),
-        str(output_filename),
-        '--color-raster',
-        str(conftest.COLORIZATION_RASTER_PATH),
-    ])
-
-    written_lasdata = laspy.read(output_filename)
-    expected_lasdata = read_expected_las
+        assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITH_COLOR)
+        assert_rgb_equal(written_lasdata, expected_lasdata)
     
-    assert_xyz_approx_equal(written_lasdata, expected_lasdata)
-    assert_rgb_equal(written_lasdata, expected_lasdata)
-    assert_srs_correct(written_lasdata)
-    assert_las_version_correct(written_lasdata)
-    assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITH_COLOR)
     assert_is_laz(output_filename, write_compressed)
