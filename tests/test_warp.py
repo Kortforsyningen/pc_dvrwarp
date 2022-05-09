@@ -66,8 +66,9 @@ def assert_srs_correct(actual_lasdata):
 
 # TODO implement extrabyte check? (use smth like np.array(lasdata.points['Pulse width']))
 
+@pytest.mark.parametrize("input_path", conftest.INPUT_PC_PATHS)
 @pytest.mark.parametrize("write_compressed", [False, True])
-def test_dvrwarp(read_expected_las, tmp_path, write_compressed):
+def test_dvrwarp(input_path, write_compressed, read_expected_las, tmp_path):
     if write_compressed:
         output_extension = 'laz'
     else:
@@ -76,7 +77,7 @@ def test_dvrwarp(read_expected_las, tmp_path, write_compressed):
     
     subprocess.check_call([
         'dvrwarp',
-        str(conftest.PC_WITH_PULSE_WIDTH_NO_SRS_PATH),
+        str(input_path),
         str(output_filename),
     ])
     
@@ -89,8 +90,9 @@ def test_dvrwarp(read_expected_las, tmp_path, write_compressed):
     assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITHOUT_COLOR)
     assert_is_laz(output_filename, write_compressed)
 
+@pytest.mark.parametrize("input_path", conftest.INPUT_PC_PATHS)
 @pytest.mark.parametrize("write_compressed", [False, True])
-def test_dvrwarp_colorized(read_expected_las, tmp_path, write_compressed):
+def test_dvrwarp_colorized(input_path, write_compressed, read_expected_las, tmp_path):
     if write_compressed:
         output_extension = 'laz'
     else:
@@ -99,7 +101,7 @@ def test_dvrwarp_colorized(read_expected_las, tmp_path, write_compressed):
 
     subprocess.check_call([
         'dvrwarp',
-        str(conftest.PC_WITH_PULSE_WIDTH_NO_SRS_PATH),
+        str(input_path),
         str(output_filename),
         '--color-raster',
         str(conftest.COLORIZATION_RASTER_PATH),
