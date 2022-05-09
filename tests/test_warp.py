@@ -64,12 +64,28 @@ def assert_srs_correct(actual_lasdata):
 
     assert actual_srs.IsSame(expected_srs)
 
-# TODO implement extrabyte check? (use smth like np.array(lasdata.points['Pulse width']))
+def assert_extradims_approx_equal(actual_lasdata, expected_lasdata):
+    expected_extradim_names = expected_lasdata.point_format.extra_dimension_names
+
+    for extradim_name in expected_extradim_names:
+        expected_dimension = expected_lasdata.point_format.dimension_by_name(extradim_name)
+        actual_dimension = actual_lasdata.point_format.dimension_by_name(extradim_name)
+
+        # We can't currently count on description to be correct in PDAL's output :-(
+        # assert actual_dimension.description == expected_dimension.description
+
+        # Check that the values in the dimension are preserved (we currently
+        # tolerate different datatype and scale/offset, as long as the
+        # effective output values are preserved to within rounding errors.)
+        expected_values = np.array(expected_lasdata.points[extradim_name])
+        actual_values = np.array(actual_lasdata.points[extradim_name])
+        np.testing.assert_allclose(actual_values, expected_values)
 
 @pytest.mark.parametrize("input_path", conftest.INPUT_PC_PATHS)
 @pytest.mark.parametrize("colorization_raster", [None, conftest.COLORIZATION_RASTER_PATH])
+@pytest.mark.parametrize("retain_extra_dims", [False, True])
 @pytest.mark.parametrize("write_compressed", [False, True])
-def test_dvrwarp(input_path, colorization_raster, write_compressed, read_expected_las, tmp_path):
+def test_dvrwarp(input_path, colorization_raster, retain_extra_dims, write_compressed, read_expected_las, tmp_path):
     if write_compressed:
         output_extension = 'laz'
     else:
@@ -86,12 +102,15 @@ def test_dvrwarp(input_path, colorization_raster, write_compressed, read_expecte
             '--color-raster',
             str(conftest.COLORIZATION_RASTER_PATH),
         ]
+    if retain_extra_dims:
+        call_args += ['--retain-extra-dims']
 
     # Print resulting argument list for easier debugging (will be captured by
     # pytest unless it is called with the -s flag)
     print('call:\n{}'.format(' '.join(call_args)))
     subprocess.check_call(call_args)
     
+    input_lasdata = laspy.read(input_path)
     written_lasdata = laspy.read(output_filename)
     expected_lasdata = read_expected_las
 
@@ -105,4 +124,7 @@ def test_dvrwarp(input_path, colorization_raster, write_compressed, read_expecte
         assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITH_COLOR)
         assert_rgb_equal(written_lasdata, expected_lasdata)
     
+    if retain_extra_dims:
+        assert_extradims_approx_equal(written_lasdata, input_lasdata)
+
     assert_is_laz(output_filename, write_compressed)
