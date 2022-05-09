@@ -14,6 +14,10 @@ import json
 OUTPUT_XY_TOLERANCE = 0.01
 OUTPUT_Z_TOLERANCE = 0.05 # some slack in case DVR90 should change slightly...
 
+EXPECTED_SRS_EPSG = 7416
+EXPECTED_SRS = osr.SpatialReference()
+EXPECTED_SRS.ImportFromEPSG(EXPECTED_SRS_EPSG)
+
 # We should be writing LAS/LAZ 1.4 files
 EXPECTED_MAJOR_VERSION = 1
 EXPECTED_MINOR_VERSION = 4
@@ -53,16 +57,13 @@ def assert_is_laz(filename, expected_is_laz):
     assert has_laszip_vlr == expected_is_laz
 
 def assert_srs_correct(actual_lasdata):
-    expected_srs = osr.SpatialReference()
-    expected_srs.ImportFromEPSG(7416)
-    
     coordinate_system_user_id = WktCoordinateSystemVlr.official_user_id()
     
     actual_wkt_vlr = actual_lasdata.vlrs.get_by_id(user_id=coordinate_system_user_id)[0]
     actual_srs = osr.SpatialReference()
     actual_srs.ImportFromWkt(actual_wkt_vlr.string)
 
-    assert actual_srs.IsSame(expected_srs)
+    assert actual_srs.IsSame(EXPECTED_SRS)
 
 def assert_extradims_approx_equal(actual_lasdata, expected_lasdata):
     expected_extradim_names = expected_lasdata.point_format.extra_dimension_names
@@ -90,12 +91,12 @@ def test_dvrwarp(input_path, colorization_raster, retain_extra_dims, write_compr
         output_extension = 'laz'
     else:
         output_extension = 'las'
-    output_filename = tmp_path.joinpath(f'output.{output_extension}')
+    output_path = tmp_path.joinpath(f'output.{output_extension}')
     
     call_args = [
         'dvrwarp',
         str(input_path),
-        str(output_filename),
+        str(output_path),
     ]
     if colorization_raster is not None:
         call_args += [
@@ -111,7 +112,7 @@ def test_dvrwarp(input_path, colorization_raster, retain_extra_dims, write_compr
     subprocess.check_call(call_args)
     
     input_lasdata = laspy.read(input_path)
-    written_lasdata = laspy.read(output_filename)
+    written_lasdata = laspy.read(output_path)
     expected_lasdata = read_expected_las
 
     assert_xyz_approx_equal(written_lasdata, expected_lasdata)
@@ -125,6 +126,8 @@ def test_dvrwarp(input_path, colorization_raster, retain_extra_dims, write_compr
         assert_rgb_equal(written_lasdata, expected_lasdata)
     
     if retain_extra_dims:
+        # The "expected" values for the extrabyte dimensions are a verbatim
+        # carryover from the input data
         assert_extradims_approx_equal(written_lasdata, input_lasdata)
 
-    assert_is_laz(output_filename, write_compressed)
+    assert_is_laz(output_path, write_compressed)
