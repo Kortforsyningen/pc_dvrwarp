@@ -33,16 +33,33 @@ def assert_pdrf_equal(actual_lasdata: LasData, expected_format_id: int) -> None:
     assert actual_lasdata.point_format.id == expected_format_id
 
 def assert_xy_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
-    np.testing.assert_allclose(actual_lasdata.points.x, expected_lasdata.points.x, rtol=0, atol=OUTPUT_XY_TOLERANCE)
-    np.testing.assert_allclose(actual_lasdata.points.y, expected_lasdata.points.y, rtol=0, atol=OUTPUT_XY_TOLERANCE)
+    actual_x = actual_lasdata.points.x
+    actual_y = actual_lasdata.points.y
+
+    expected_x = expected_lasdata.points.x
+    expected_y = expected_lasdata.points.y
+
+    actual_xy = np.column_stack([actual_x, actual_y])
+    expected_xy = np.column_stack([expected_x, expected_y])
+
+    np.testing.assert_allclose(actual_xy, expected_xy, rtol=0, atol=OUTPUT_XY_TOLERANCE)
 
 def assert_z_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
     np.testing.assert_allclose(actual_lasdata.points.z, expected_lasdata.points.z, rtol=0, atol=OUTPUT_Z_TOLERANCE)
 
 def assert_rgb_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
-    np.testing.assert_equal(actual_lasdata.points.red, expected_lasdata.points.red)
-    np.testing.assert_equal(actual_lasdata.points.green, expected_lasdata.points.green)
-    np.testing.assert_equal(actual_lasdata.points.blue, expected_lasdata.points.blue)
+    actual_red = actual_lasdata.points.red
+    actual_green = actual_lasdata.points.green
+    actual_blue = actual_lasdata.points.blue
+
+    expected_red = expected_lasdata.points.red
+    expected_green = expected_lasdata.points.green
+    expected_blue = expected_lasdata.points.blue
+
+    actual_rgb = np.column_stack([actual_red, actual_green, actual_blue])
+    expected_rgb = np.column_stack([expected_red, expected_green, expected_blue])
+
+    np.testing.assert_equal(actual_rgb, expected_rgb)
 
 def assert_is_laz(filename: Path, expected_is_laz: bool) -> None:
     laszip_user_id = LasZipVlr.official_user_id()
