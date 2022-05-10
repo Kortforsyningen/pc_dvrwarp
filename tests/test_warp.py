@@ -101,7 +101,7 @@ def test_dvrwarp(input_path, colorization_raster, retain_extra_dims, write_compr
     if colorization_raster is not None:
         call_args += [
             '--color-raster',
-            str(conftest.COLORIZATION_RASTER_PATH),
+            str(colorization_raster),
         ]
     if retain_extra_dims:
         call_args += ['--retain-extra-dims']
