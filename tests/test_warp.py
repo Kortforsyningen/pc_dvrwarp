@@ -61,11 +61,11 @@ def assert_rgb_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None
 
     np.testing.assert_equal(actual_rgb, expected_rgb)
 
-def assert_is_laz(filename: Path, expected_is_laz: bool) -> None:
+def assert_is_laz(path: Path, expected_is_laz: bool) -> None:
     laszip_user_id = LasZipVlr.official_user_id()
     
     # A bit hackish - Laspy seems to hide the presence of LASzip compression from the user, so inspect with PDAL instead
-    pdal_info_output = subprocess.check_output(['pdal', 'info', '--metadata', str(filename)])
+    pdal_info_output = subprocess.check_output(['pdal', 'info', '--metadata', str(path)])
     info_obj = json.loads(pdal_info_output)
     metadata = info_obj['metadata']
     vlrs = [metadata[key] for key in metadata if key.startswith('vlr_')]
