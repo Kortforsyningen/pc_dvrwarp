@@ -1,7 +1,4 @@
-from . import conftest
-
 import pytest
-import laspy
 from laspy.vlrs.known import LasZipVlr, WktCoordinateSystemVlr
 from osgeo import osr
 import numpy as np
@@ -33,9 +30,11 @@ def assert_las_version_correct(actual_lasdata):
 def assert_pdrf_equal(actual_lasdata, expected_format_id):
     assert actual_lasdata.point_format.id == expected_format_id
 
-def assert_xyz_approx_equal(actual_lasdata, expected_lasdata):
+def assert_xy_approx_equal(actual_lasdata, expected_lasdata):
     np.testing.assert_allclose(actual_lasdata.points.x, expected_lasdata.points.x, rtol=0, atol=OUTPUT_XY_TOLERANCE)
     np.testing.assert_allclose(actual_lasdata.points.y, expected_lasdata.points.y, rtol=0, atol=OUTPUT_XY_TOLERANCE)
+
+def assert_z_approx_equal(actual_lasdata, expected_lasdata):
     np.testing.assert_allclose(actual_lasdata.points.z, expected_lasdata.points.z, rtol=0, atol=OUTPUT_Z_TOLERANCE)
 
 def assert_rgb_equal(actual_lasdata, expected_lasdata):
@@ -82,52 +81,40 @@ def assert_extradims_approx_equal(actual_lasdata, expected_lasdata):
         actual_values = np.array(actual_lasdata.points[extradim_name])
         np.testing.assert_allclose(actual_values, expected_values)
 
-@pytest.mark.parametrize("input_path", conftest.INPUT_PC_PATHS)
-@pytest.mark.parametrize("colorization_raster", [None, conftest.COLORIZATION_RASTER_PATH])
-@pytest.mark.parametrize("retain_extra_dims", [False, True])
-@pytest.mark.parametrize("write_compressed", [False, True])
-def test_dvrwarp(input_path, colorization_raster, retain_extra_dims, write_compressed, read_expected_las, tmp_path):
-    if write_compressed:
-        output_extension = 'laz'
-    else:
-        output_extension = 'las'
-    output_path = tmp_path.joinpath(f'output.{output_extension}')
-    
-    call_args = [
-        'dvrwarp',
-        str(input_path),
-        str(output_path),
-    ]
-    if colorization_raster is not None:
-        call_args += [
-            '--color-raster',
-            str(colorization_raster),
-        ]
-    if retain_extra_dims:
-        call_args += ['--retain-extra-dims']
+def test_xy(output_lasdata, expected_lasdata):
+    assert_xy_approx_equal(output_lasdata, expected_lasdata)
 
-    # Print resulting argument list for easier debugging (will be captured by
-    # pytest unless it is called with the -s flag)
-    print('call:\n{}'.format(' '.join(call_args)))
-    subprocess.check_call(call_args)
-    
-    input_lasdata = laspy.read(input_path)
-    written_lasdata = laspy.read(output_path)
-    expected_lasdata = read_expected_las
+def test_z(output_lasdata, expected_lasdata):
+    assert_z_approx_equal(output_lasdata, expected_lasdata)
 
-    assert_xyz_approx_equal(written_lasdata, expected_lasdata)
-    assert_srs_correct(written_lasdata)
-    assert_las_version_correct(written_lasdata)
-    
+def test_srs(output_lasdata):
+    assert_srs_correct(output_lasdata)
+
+def test_las_version(output_lasdata):
+    assert_las_version_correct(output_lasdata)
+
+def test_pdrf(output_lasdata, colorization_raster):
     if colorization_raster is None:
-        assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITHOUT_COLOR)
+        assert_pdrf_equal(output_lasdata, EXPECTED_PDRF_WITHOUT_COLOR)
     else:
-        assert_pdrf_equal(written_lasdata, EXPECTED_PDRF_WITH_COLOR)
-        assert_rgb_equal(written_lasdata, expected_lasdata)
-    
-    if retain_extra_dims:
-        # The "expected" values for the extrabyte dimensions are a verbatim
-        # carryover from the input data
-        assert_extradims_approx_equal(written_lasdata, input_lasdata)
+        assert_pdrf_equal(output_lasdata, EXPECTED_PDRF_WITH_COLOR)
 
+def test_rgb(output_lasdata, expected_lasdata, colorization_raster):
+    if colorization_raster is None:
+        pytest.skip('no colorization applied')
+    
+    assert_rgb_equal(output_lasdata, expected_lasdata)
+
+def test_srs(output_lasdata):
+    assert_srs_correct(output_lasdata)
+
+def test_extra_dims(input_lasdata, output_lasdata, retain_extra_dims):
+    if not retain_extra_dims:
+        pytest.skip('extrabyte dimensions not retained')
+
+    # The "expected" values for the extrabyte dimensions are a verbatim
+    # carryover from the input data
+    assert_extradims_approx_equal(output_lasdata, input_lasdata)
+
+def test_compression(output_path, write_compressed):
     assert_is_laz(output_path, write_compressed)
