@@ -1,8 +1,10 @@
 import pytest
+from laspy.lasdata import LasData
 from laspy.vlrs.known import LasZipVlr, WktCoordinateSystemVlr
 from osgeo import osr
 import numpy as np
 
+from pathlib import Path
 import subprocess
 import json
 
@@ -23,30 +25,47 @@ EXPECTED_MINOR_VERSION = 4
 EXPECTED_PDRF_WITHOUT_COLOR = 6
 EXPECTED_PDRF_WITH_COLOR = 7
 
-def assert_las_version_correct(actual_lasdata):
+def assert_las_version_correct(actual_lasdata: LasData) -> None:
     assert actual_lasdata.header.major_version == EXPECTED_MAJOR_VERSION
     assert actual_lasdata.header.minor_version == EXPECTED_MINOR_VERSION
 
-def assert_pdrf_equal(actual_lasdata, expected_format_id):
+def assert_pdrf_equal(actual_lasdata: LasData, expected_format_id: int) -> None:
     assert actual_lasdata.point_format.id == expected_format_id
 
-def assert_xy_approx_equal(actual_lasdata, expected_lasdata):
-    np.testing.assert_allclose(actual_lasdata.points.x, expected_lasdata.points.x, rtol=0, atol=OUTPUT_XY_TOLERANCE)
-    np.testing.assert_allclose(actual_lasdata.points.y, expected_lasdata.points.y, rtol=0, atol=OUTPUT_XY_TOLERANCE)
+def assert_xy_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
+    actual_x = actual_lasdata.points.x
+    actual_y = actual_lasdata.points.y
 
-def assert_z_approx_equal(actual_lasdata, expected_lasdata):
+    expected_x = expected_lasdata.points.x
+    expected_y = expected_lasdata.points.y
+
+    actual_xy = np.column_stack([actual_x, actual_y])
+    expected_xy = np.column_stack([expected_x, expected_y])
+
+    np.testing.assert_allclose(actual_xy, expected_xy, rtol=0, atol=OUTPUT_XY_TOLERANCE)
+
+def assert_z_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
     np.testing.assert_allclose(actual_lasdata.points.z, expected_lasdata.points.z, rtol=0, atol=OUTPUT_Z_TOLERANCE)
 
-def assert_rgb_equal(actual_lasdata, expected_lasdata):
-    np.testing.assert_equal(actual_lasdata.points.red, expected_lasdata.points.red)
-    np.testing.assert_equal(actual_lasdata.points.green, expected_lasdata.points.green)
-    np.testing.assert_equal(actual_lasdata.points.blue, expected_lasdata.points.blue)
+def assert_rgb_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
+    actual_red = actual_lasdata.points.red
+    actual_green = actual_lasdata.points.green
+    actual_blue = actual_lasdata.points.blue
 
-def assert_is_laz(filename, expected_is_laz):
+    expected_red = expected_lasdata.points.red
+    expected_green = expected_lasdata.points.green
+    expected_blue = expected_lasdata.points.blue
+
+    actual_rgb = np.column_stack([actual_red, actual_green, actual_blue])
+    expected_rgb = np.column_stack([expected_red, expected_green, expected_blue])
+
+    np.testing.assert_equal(actual_rgb, expected_rgb)
+
+def assert_is_laz(path: Path, expected_is_laz: bool) -> None:
     laszip_user_id = LasZipVlr.official_user_id()
     
     # A bit hackish - Laspy seems to hide the presence of LASzip compression from the user, so inspect with PDAL instead
-    pdal_info_output = subprocess.check_output(['pdal', 'info', '--metadata', str(filename)])
+    pdal_info_output = subprocess.check_output(['pdal', 'info', '--metadata', str(path)])
     info_obj = json.loads(pdal_info_output)
     metadata = info_obj['metadata']
     vlrs = [metadata[key] for key in metadata if key.startswith('vlr_')]
@@ -55,7 +74,7 @@ def assert_is_laz(filename, expected_is_laz):
     has_laszip_vlr = laszip_user_id in vlr_user_ids
     assert has_laszip_vlr == expected_is_laz
 
-def assert_srs_correct(actual_lasdata):
+def assert_srs_correct(actual_lasdata: LasData) -> None:
     coordinate_system_user_id = WktCoordinateSystemVlr.official_user_id()
     
     actual_wkt_vlr = actual_lasdata.vlrs.get_by_id(user_id=coordinate_system_user_id)[0]
@@ -64,7 +83,7 @@ def assert_srs_correct(actual_lasdata):
 
     assert actual_srs.IsSame(EXPECTED_SRS)
 
-def assert_extradims_approx_equal(actual_lasdata, expected_lasdata):
+def assert_extradims_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
     expected_extradim_names = expected_lasdata.point_format.extra_dimension_names
 
     for extradim_name in expected_extradim_names:
