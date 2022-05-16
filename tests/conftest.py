@@ -36,20 +36,20 @@ def expected_lasdata():
     return lasdata
 
 # Fixtures to exercise the different combinations of input arguments
-@pytest.fixture(scope='function', params=[None, COLORIZATION_RASTER_PATH])
+@pytest.fixture(params=[None, COLORIZATION_RASTER_PATH])
 def colorization_raster(request):
     return request.param
 
-@pytest.fixture(scope='function', params=[False, True])
+@pytest.fixture(params=[False, True])
 def retain_extra_dims(request):
     return request.param
 
-@pytest.fixture(scope='function', params=[False, True])
+@pytest.fixture(params=[False, True])
 def write_compressed(request):
     return request.param
 
 # The input pointcloud file, with the various formats
-@pytest.fixture(scope='function', params=INPUT_PC_PATHS)
+@pytest.fixture(params=INPUT_PC_PATHS)
 def input_path(request):
     return request.param
 
