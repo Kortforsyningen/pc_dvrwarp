@@ -83,19 +83,45 @@ def assert_srs_correct(actual_lasdata: LasData) -> None:
 
     assert actual_srs.IsSame(EXPECTED_SRS)
 
-def assert_extradims_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
+def assert_extradim_descriptors_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
+    # The `extra_dimensions` fields are generators of
+    # laspy.point.dims.DimensionInfo elements. Convert to lists so we can
+    # compare them with `==`.
+    expected_extradims = list(expected_lasdata.point_format.extra_dimensions)
+    actual_extradims = list(actual_lasdata.point_format.extra_dimensions)
+
+    assert actual_extradims == expected_extradims
+
+def get_extradim_raw_values(lasdata: LasData, extradim_name: str) -> np.ndarray:
+    extradim = lasdata.points[extradim_name]
+
+    # lasdata.points[extradim_name] may be either a ScaledArrayView or a
+    # simple NumPy array, depending on the data type etc. Make sure we handle
+    # both cases.
+    try:
+        # If it's a ScaledArrayView, we can grab a NumPy array of raw values
+        # from the .array attribute...
+        raw_values = extradim.array
+    except AttributeError:
+        # ...otherwise, the dimension is simply represented by a NumPy array
+        raw_values = extradim
+
+    return raw_values
+
+def assert_extradim_raw_values_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
     expected_extradim_names = expected_lasdata.point_format.extra_dimension_names
 
     for extradim_name in expected_extradim_names:
-        expected_dimension = expected_lasdata.point_format.dimension_by_name(extradim_name)
-        actual_dimension = actual_lasdata.point_format.dimension_by_name(extradim_name)
+        expected_extradim_values = get_extradim_raw_values(expected_lasdata, extradim_name)
+        actual_extradim_values = get_extradim_raw_values(actual_lasdata, extradim_name)
+        np.testing.assert_equal(actual_extradim_values, expected_extradim_values)
 
-        # We can't currently count on description to be correct in PDAL's output :-(
-        # assert actual_dimension.description == expected_dimension.description
+def assert_extradim_scaled_values_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
+    expected_extradim_names = expected_lasdata.point_format.extra_dimension_names
 
-        # Check that the values in the dimension are preserved (we currently
-        # tolerate different datatype and scale/offset, as long as the
-        # effective output values are preserved to within rounding errors.)
+    for extradim_name in expected_extradim_names:
+        # .points[extradim_name] may be either a ScaledArrayView or a simple
+        # NumPy array, but can always be converted to NumPy arrays
         expected_values = np.array(expected_lasdata.points[extradim_name])
         actual_values = np.array(actual_lasdata.points[extradim_name])
         np.testing.assert_allclose(actual_values, expected_values)
@@ -112,6 +138,9 @@ def test_srs(output_lasdata):
 def test_las_version(output_lasdata):
     assert_las_version_correct(output_lasdata)
 
+def test_compression(output_path, write_compressed):
+    assert_is_laz(output_path, write_compressed)
+
 def test_pdrf(output_lasdata, colorization_raster):
     if colorization_raster is None:
         assert_pdrf_equal(output_lasdata, EXPECTED_PDRF_WITHOUT_COLOR)
@@ -127,13 +156,36 @@ def test_rgb(output_lasdata, expected_lasdata, colorization_raster):
 def test_srs(output_lasdata):
     assert_srs_correct(output_lasdata)
 
-def test_extra_dims(input_lasdata, output_lasdata, retain_extra_dims):
-    if not retain_extra_dims:
+# Extrabyte tests below.
+#
+# The "expected" values for the extrabyte dimensions are a verbatim
+# carryover from the input data. PDAL tends to change datatype into float64
+# and make other changes to extrabyte dimensions, so for the moment we only
+# test that the ScaledArrayView representation of each dimension is the same
+# (to within rounding errors).
+#
+# Once the implementation is ready, the more stringent extrabyte tests below
+# should be used rather than the approximate test on scaled values.
+
+# TODO This test is redundant once the more stringent extrabyte tests pass
+def test_extradim_scaled_values(input_lasdata, output_lasdata, retain_extra_dims):
+    if retain_extra_dims:
+        assert_extradim_scaled_values_approx_equal(output_lasdata, input_lasdata)
+    else:
         pytest.skip('extrabyte dimensions not retained')
 
-    # The "expected" values for the extrabyte dimensions are a verbatim
-    # carryover from the input data
-    assert_extradims_approx_equal(output_lasdata, input_lasdata)
+# TODO Make this test pass
+@pytest.mark.skip('currently unsupported')
+def test_extradim_descriptors(input_lasdata, output_lasdata, retain_extra_dims):
+    if retain_extra_dims:
+        assert_extradim_descriptors_equal(output_lasdata, input_lasdata)
+    else:
+        pytest.skip('extrabyte dimensions not retained')
 
-def test_compression(output_path, write_compressed):
-    assert_is_laz(output_path, write_compressed)
+# TODO Make this test pass
+@pytest.mark.skip('currently unsupported')
+def test_extradim_raw_values(output_lasdata, input_lasdata, retain_extra_dims):
+    if retain_extra_dims:
+        assert_extradim_raw_values_equal(output_lasdata, input_lasdata)
+    else:
+        pytest.skip('extrabyte dimensions not retained')
