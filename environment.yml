@@ -8,5 +8,5 @@ dependencies:
   - laspy>=2.0
   - pip
   - pip:
-    - lazrs
+    - laszip
   - pytest
