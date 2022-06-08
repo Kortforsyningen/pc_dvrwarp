@@ -20,6 +20,11 @@ def main():
         output_filename,
     ]
 
+    pdal_args += [
+        "assign",
+        "--filters.assign.assignment=Classification[32:255]=1",
+    ]
+
     if input_arguments.color_raster is not None:
         pdal_args += [
             "colorization",

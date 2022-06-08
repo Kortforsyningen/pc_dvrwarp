@@ -92,6 +92,18 @@ def assert_extradim_descriptors_equal(actual_lasdata: LasData, expected_lasdata:
 
     assert actual_extradims == expected_extradims
 
+def get_extradim_names_to_test(output_lasdata: LasData, input_lasdata: LasData) -> list:
+    input_extradim_names = input_lasdata.point_format.extra_dimension_names
+
+    # Due to the possibility of input extrabyte dimensions like "Red",
+    # "Green", "Blue" being (acceptably) mapped to the corresponding non-
+    # extrabyte dimensions in output, we discard those from the list of
+    # dimension names to check
+    output_stddim_lowercase_names = [dim_name.lower() for dim_name in output_lasdata.point_format.standard_dimension_names]
+    extradim_names_to_test = [dim_name for dim_name in input_extradim_names if dim_name.lower() not in output_stddim_lowercase_names]
+
+    return extradim_names_to_test
+
 def get_extradim_raw_values(lasdata: LasData, extradim_name: str) -> np.ndarray:
     extradim = lasdata.points[extradim_name]
 
@@ -117,9 +129,9 @@ def assert_extradim_raw_values_equal(actual_lasdata: LasData, expected_lasdata: 
         np.testing.assert_equal(actual_extradim_values, expected_extradim_values)
 
 def assert_extradim_scaled_values_approx_equal(actual_lasdata: LasData, expected_lasdata: LasData) -> None:
-    expected_extradim_names = expected_lasdata.point_format.extra_dimension_names
+    extradim_names_to_test = get_extradim_names_to_test(actual_lasdata, expected_lasdata)
 
-    for extradim_name in expected_extradim_names:
+    for extradim_name in extradim_names_to_test:
         # .points[extradim_name] may be either a ScaledArrayView or a simple
         # NumPy array, but can always be converted to NumPy arrays
         expected_values = np.array(expected_lasdata.points[extradim_name])
