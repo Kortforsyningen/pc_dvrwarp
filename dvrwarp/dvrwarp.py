@@ -36,6 +36,7 @@ def main():
     
     pdal_args += [
         "reprojection",
+        "--readers.las.nosrs=true", # don't throw error with wrong/missing SRS
         "--readers.las.override_srs=EPSG:25832",
         "--filters.reprojection.in_srs=EPSG:25832",
         "--filters.reprojection.out_srs=EPSG:7416",
