@@ -2,7 +2,7 @@ name: dvrwarp-dev
 channels:
   - conda-forge
 dependencies:
-  - pdal=2.1
+  - pdal>=2.5
   # for testing and preparing test data:
   - gdal
   - laspy>=2.0
