@@ -36,7 +36,6 @@ def main():
     
     pdal_args += [
         "reprojection",
-        "--readers.las.nosrs=true", # don't throw error with wrong/missing SRS
         "--readers.las.fix_dims=false", # don't mess with "Pulse width"
         "--readers.las.override_srs=EPSG:25832",
         "--filters.reprojection.in_srs=EPSG:25832",
